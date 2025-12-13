@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaveSpeed Pro</title>
+    <style>
+        /* --- DESIGN RESTORED TO "SCREENSHOT 90" STYLE --- */
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --input-bg: #334155;
+            --border: #475569;
+            --glow: rgba(59, 130, 246, 0.5);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app-container {
+            width: 90%;
+            max-width: 850px;
+            height: 95vh;
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .header {
+            padding: 25px;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        /* --- THE HOVER INPUTS YOU LIKED --- */
+        .nice-input {
+            flex: 1;
+            background: var(--input-bg);
+            border: 2px solid var(--border);
+            padding: 15px;
+            border-radius: 12px;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .nice-input:hover {
+            border-color: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .nice-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+            transform: translateY(0);
+        }
+
+        .chat-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: radial-gradient(circle at center, #243045 0%, #1e293b 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            line-height: 1.6;
+            font-size: 1rem;
+            word-wrap: break-word;
+            animation: popIn 0.3s ease-out;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        @keyframes popIn { 0% { opacity: 0; transform: translateY(5px); } 100% { opacity: 1; transform: translateY(0); } }
+
+        .ai { align-self: flex-start; background: var(--input-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+        
+        .user { 
+            align-self: flex-end; 
+            background: linear-gradient(135deg, #3b82f6, #2563eb); 
+            color: white; 
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+        }
+
+        .bottom-bar {
+            padding: 20px;
+            background: var(--card);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 15px;
+        }
+
+        .prompt-input {
+            flex: 1;
+            padding: 15px;
+            border-radius: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        .prompt-input:focus { border-color: var(--accent); }
+
+        /* --- THE HOVER BUTTON YOU LIKED --- */
+        .send-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0 30px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .send-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.6);
+        }
+
+        .send-btn:active { transform: scale(0.98); }
+        .send-btn:disabled { background: var(--border); transform: none; cursor: not-allowed; box-shadow: none; }
+        
+        .timer { font-size: 0.8rem; background: #fbbf24; color: black; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <div class="controls-row">
+            <input type="text" id="linkInput" class="nice-input" placeholder="Paste WaveSpeed Link..." value="https://api.wavespeed.ai/api/v3/google/nano-banana-pro/edit">
+            <input type="password" id="keyInput" class="nice-input" placeholder="Paste API Key...">
+        </div>
+        <div class="controls-row">
+            <input type="text" id="imgInput" class="nice-input" placeholder="Start Image URL" value="https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/img2img/sketch-mountains-input.jpg">
+        </div>
+    </div>
+
+    <div class="chat-area" id="chat">
+        <div class="message ai">
+            <strong>System Online.</strong><br>
+            Design restored. Connection engine ready. Click Send to test.
+        </div>
+    </div>
+
+    <div class="bottom-bar">
+        <input type="text" id="userInput" class="prompt-input" placeholder="Type instruction...">
+        <button id="sendBtn" class="send-btn">SEND</button>
+    </div>
+</div>
+
+<script>
+    const chat = document.getElementById('chat');
+    const sendBtn = document.getElementById('sendBtn');
+    const LOCAL_SERVER = "http://localhost:3000/generate";
+    let timerInt;
+
+    function addMsg(html, type="ai") {
+        const div = document.createElement('div');
+        div.className = `message ${type}`;
+        div.innerHTML = html;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+        return div;
+    }
+
+    sendBtn.addEventListener('click', async () => {
+        const prompt = document.getElementById('userInput').value;
+        const apiUrl = document.getElementById('linkInput').value;
+        const apiKey = document.getElementById('keyInput').value;
+        const imgUrl = document.getElementById('imgInput').value;
+
+        if(!prompt || !apiUrl || !apiKey || !imgUrl) return alert("Fill all fields!");
+
+        addMsg(prompt, "user");
+        const loader = addMsg(`Processing... <span id="time" class="timer">0s</span>`, "ai");
+        sendBtn.disabled = true;
+
+        // Visual Timer
+        let s = 0;
+        timerInt = setInterval(() => {
+            s++;
+            const t = document.getElementById("time");
+            if(t) {
+                t.innerText = s + "s";
+                if(s > 5) loader.innerHTML = `Model Warming Up... <span class="timer">${s}s</span>`;
+                if(s > 30) loader.innerHTML = `Still Rendering (Wait)... <span class="timer">${s}s</span>`;
+            }
+        }, 1000);
+
+        try {
+            const response = await fetch(LOCAL_SERVER, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    apiKey, apiUrl,
+                    payload: {
+                        prompt,
+                        images: [imgUrl],
+                        resolution: "1k",
+                        output_format: "png",
+                        enable_base64_output: true
+                    }
+                })
+            });
+
+            const data = await response.json();
+            clearInterval(timerInt);
+
+            if (data.error) throw new Error(data.error);
+
+            // Handle Output
+            let imgSrc = null;
+            if(data.outputs && data.outputs[0] && data.outputs[0].data) imgSrc = data.outputs[0].data;
+            else if(data.image) imgSrc = data.image;
+
+            if(imgSrc) {
+                if(!imgSrc.startsWith('http')) imgSrc = "data:image/png;base64," + imgSrc;
+                loader.innerHTML = `<img src="${imgSrc}" style="max-width:100%; border-radius:10px;">`;
+            } else {
+                loader.innerText = "Done, but no image found in response.";
+                console.log(data);
+            }
+
+        } catch (e) {
+            clearInterval(timerInt);
+            loader.innerHTML = `Error: ${e.message}`;
+            loader.style.background = "#ef4444";
+            loader.style.color = "white";
+        } finally {
+            sendBtn.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>
