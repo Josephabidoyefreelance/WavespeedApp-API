@@ -6,32 +6,40 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper: Fix common URL/String issues
+// Helper: Fix common URL/String issues (Removes extra spaces or quotes)
 const clean = (str) => (str ? str.trim().replace(/["']/g, "") : "");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 app.post("/generate", async (req, res) => {
-    // Set a long timeout (10 mins)
+    // Increase server timeout to 10 minutes
     req.setTimeout(600000);
     res.setTimeout(600000);
 
     try {
-        let { apiKey, apiUrl, payload } = req.body;
+        // --- FIX: SECURELY GET API KEY FROM RENDER ENVIRONMENT ---
+        const apiKey = process.env.WAVESPEED_API_KEY; 
         
-        // Clean inputs
-        apiKey = clean(apiKey);
+        // Get job details from the frontend (only apiUrl and payload remain in req.body)
+        let { apiUrl, payload } = req.body;
+        
+        // Ensure data exists
+        if (!apiKey) {
+            // This is the error that confirms the server is working but the key is missing on Render.
+            return res.status(500).json({ error: "API Key is missing from the server environment. Please set WAVESPEED_API_KEY on Render." });
+        }
+        
         apiUrl = clean(apiUrl);
         if (payload.images && payload.images[0]) {
             payload.images[0] = clean(payload.images[0]);
         }
 
-        console.log(`\n--> New Job: "${payload.prompt}"`);
+        console.log(`\n--> New Job received. Prompt: "${payload.prompt}"`);
 
-        // 1. Send Job to WaveSpeed
+        // 1. Send Job to WaveSpeed (using the secure key)
         const startReq = await fetch(apiUrl, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${apiKey}`,
+                "Authorization": `Bearer ${apiKey}`, 
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(payload)
@@ -60,24 +68,20 @@ app.post("/generate", async (req, res) => {
 
         // 3. Wait Loop
         for (let i = 1; i <= 100; i++) {
-            await wait(4000);
+            await wait(4000); // Check every 4 seconds
 
             const checkReq = await fetch(statusUrl, {
                 headers: { "Authorization": `Bearer ${apiKey}` }
             });
             const checkData = await checkReq.json();
             
-            // Handle different data wrappers
             const root = checkData.data || checkData;
             const status = root.status;
             
-            // Log live status to terminal
             process.stdout.write(`\r   Attempt ${i}: Status = ${status}     `);
 
-            // --- THE FIX IS HERE ---
-            // We now check for "succeeded" OR "completed"
             if (status === "succeeded" || status === "completed") {
-                console.log("\n✅ SUCCESS! Sending image to UI.");
+                console.log("\n✅ Job Complete! Sending image to UI.");
                 return res.json(root);
             }
 
@@ -87,12 +91,16 @@ app.post("/generate", async (req, res) => {
             }
         }
 
+        console.log("\n❌ TIMEOUT: Gave up after 6.6 minutes.");
         res.status(504).json({ error: "Timeout: Server took too long to respond." });
 
     } catch (err) {
-        console.error("\n❌ System Error:", err.message);
+        console.error(`\n❌ System Error: ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });
 
-app.listen(3000, () => console.log("\n✅ SERVER READY. Open your index.html now."));
+// --- RENDER PORT LOGIC ---
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => console.log(`\n✅ SERVER READY. Listening on port ${PORT}`));
