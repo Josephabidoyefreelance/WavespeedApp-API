@@ -103,7 +103,8 @@ const resolution = document.getElementById("resolution");
 const format = document.getElementById("format");
 
 // ✅ LIVE URL (Since you are serving index.html via server.js now)
-const API = "/generate"; 
+// ✅ CORRECT FOR DEPLOYMENT:
+const API = "https://wavespeedapp-api-7ce9.onrender.com/generate";
 
 // --- DRAG & DROP LOGIC ---
 function handleFiles(files) {
