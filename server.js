@@ -1,10 +1,22 @@
 import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
+import path from "path"; // Import path module
+import { fileURLToPath } from "url"; // Import helper for file paths
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// --- SERVE THE FRONTEND (index.html) ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// This tells the server to serve index.html when you visit the root URL
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "index.html"));
+});
+// ---------------------------------------
 
 // Helper: Fix common URL/String issues
 const clean = (str) => (str ? str.trim().replace(/["']/g, "") : "");
@@ -15,7 +27,6 @@ app.post("/generate", async (req, res) => {
     req.setTimeout(600000);
     res.setTimeout(600000);
 
-    // --- UNIVERSAL API KEY LOGIC ---
     // 1. Try to get key securely from the environment (Render)
     let apiKey = process.env.WAVESPEED_API_KEY;
     
@@ -79,19 +90,17 @@ app.post("/generate", async (req, res) => {
             let root = checkData.data || checkData;
             const status = root.status;
             
-            process.stdout.write(`\r   Attempt ${i}: Status = ${status}     `);
+            // Log status to server console (hidden from user)
+            // process.stdout.write(`\r   Attempt ${i}: Status = ${status}     `);
 
             if (status === "succeeded" || status === "completed") {
                 
                 // --- SMART FIX: HANDLE RAW STRING OUTPUTS ---
-                // If output is ["image/webp;base64,..."] instead of [{data: "..."}]
                 if (root.outputs && typeof root.outputs[0] === 'string') {
                     let rawImage = root.outputs[0];
-                    // Remove the prefix "image/webp;base64," so we just have the code
                     if (rawImage.includes('base64,')) {
                         rawImage = rawImage.split('base64,')[1];
                     }
-                    // Reformat it so the Frontend understands it
                     root.outputs = [{ data: rawImage }];
                 }
                 // ---------------------------------------------
