@@ -55,7 +55,6 @@
             gap: 15px;
         }
 
-        /* --- THE HOVER INPUTS YOU LIKED --- */
         .nice-input {
             flex: 1;
             background: var(--input-bg);
@@ -113,6 +112,8 @@
             box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
         }
 
+        .error { align-self: center; background: #ef4444; color: white; }
+
         .bottom-bar {
             padding: 20px;
             background: var(--card);
@@ -135,7 +136,6 @@
         
         .prompt-input:focus { border-color: var(--accent); }
 
-        /* --- THE HOVER BUTTON YOU LIKED --- */
         .send-btn {
             background: var(--accent);
             color: white;
@@ -181,7 +181,7 @@
     <div class="chat-area" id="chat">
         <div class="message ai">
             <strong>System Online.</strong><br>
-            Design restored. Connection engine ready. Click Send to test.
+            Final image decoder ready. The connection should be stable now.
         </div>
     </div>
 
@@ -205,6 +205,29 @@
         chat.scrollTop = chat.scrollHeight;
         return div;
     }
+    
+    // --- FINAL ROBUST IMAGE FINDER ---
+    function findImageInResponse(data) {
+        let imgSrc = null;
+
+        // 1. Check outputs array (Most common for async models)
+        if (data.outputs && data.outputs.length > 0) {
+            // Check for the base64 string
+            if (data.outputs[0].data) return data.outputs[0].data;
+            // Check if it's a raw URL string
+            if (typeof data.outputs[0] === 'string' && (data.outputs[0].startsWith('http') || data.outputs[0].startsWith('data:image'))) {
+                return data.outputs[0];
+            }
+        }
+        // 2. Check for image property at the root (Old API standard)
+        if (data.image) return data.image;
+
+        // 3. Check for the direct URL property (If the API gives a direct link)
+        if (data.url && typeof data.url === 'string' && data.url.startsWith('http')) return data.url;
+
+        return null;
+    }
+
 
     sendBtn.addEventListener('click', async () => {
         const prompt = document.getElementById('userInput').value;
@@ -225,8 +248,7 @@
             const t = document.getElementById("time");
             if(t) {
                 t.innerText = s + "s";
-                if(s > 5) loader.innerHTML = `Model Warming Up... <span class="timer">${s}s</span>`;
-                if(s > 30) loader.innerHTML = `Still Rendering (Wait)... <span class="timer">${s}s</span>`;
+                if(s > 30) loader.innerHTML = `Still Rendering (WaveSpeed Queue)... <span class="timer">${s}s</span>`;
             }
         }, 1000);
 
@@ -246,29 +268,36 @@
                 })
             });
 
+            // If the fetch fails completely (like network error), catch it immediately
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Connection Error: ${response.status} - ${errText || 'Check server console'}`);
+            }
+
             const data = await response.json();
             clearInterval(timerInt);
 
             if (data.error) throw new Error(data.error);
 
-            // Handle Output
-            let imgSrc = null;
-            if(data.outputs && data.outputs[0] && data.outputs[0].data) imgSrc = data.outputs[0].data;
-            else if(data.image) imgSrc = data.image;
+            // Use the new, robust finder function
+            let imgSrc = findImageInResponse(data);
 
             if(imgSrc) {
-                if(!imgSrc.startsWith('http')) imgSrc = "data:image/png;base64," + imgSrc;
+                // Prepend Base64 header if it's missing
+                if(!imgSrc.startsWith('http') && !imgSrc.startsWith('data:image')) {
+                    imgSrc = "data:image/png;base64," + imgSrc;
+                }
+                
                 loader.innerHTML = `<img src="${imgSrc}" style="max-width:100%; border-radius:10px;">`;
             } else {
-                loader.innerText = "Done, but no image found in response.";
-                console.log(data);
+                loader.innerText = "Success, but image data was not found in the expected format. Check console for raw data.";
+                console.error("Raw Successful API Response:", data);
             }
 
         } catch (e) {
             clearInterval(timerInt);
             loader.innerHTML = `Error: ${e.message}`;
-            loader.style.background = "#ef4444";
-            loader.style.color = "white";
+            loader.className = "message error";
         } finally {
             sendBtn.disabled = false;
         }
