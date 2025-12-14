@@ -33,9 +33,15 @@ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);c
 .timer{font-size:.8rem;background:#fbbf24;color:#000;padding:2px 6px;border-radius:4px;margin-left:6px}
 
 /* Drag & Drop Styling */
-.upload-label { cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; color: #aaa; transition: all 0.2s; }
+.upload-label { cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; color: #aaa; transition: all 0.2s; position: relative; }
 .upload-label:hover { color: #fff; border-color: var(--accent); }
 .upload-label.dragover { background: rgba(59, 130, 246, 0.2); border-color: var(--accent); color: white; border-style: dashed; }
+
+/* File List Styling */
+#fileList { display: flex; flex-direction: column; gap: 5px; margin-top: -10px; margin-bottom: 10px; max-height: 100px; overflow-y: auto; }
+.file-item { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 6px; font-size: 0.85rem; }
+.remove-btn { color: #ef4444; cursor: pointer; font-weight: bold; padding: 2px 6px; }
+.remove-btn:hover { background: rgba(239, 68, 68, 0.2); border-radius: 4px; }
 </style>
 </head>
 
@@ -52,7 +58,7 @@ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);c
         <input id="imgInput" class="nice-input" placeholder="Image URL (optional)">
         
         <label class="nice-input upload-label" id="dropZone">
-            <span id="fileName">📂 Drag & Drop Images</span>
+            <span id="fileName">📂 Drag & Drop / Click</span>
             <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
         </label>
 
@@ -70,6 +76,8 @@ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);c
         </select>
     </div>
 
+    <div id="fileList"></div>
+
     <div class="controls-row">
         <select id="resolution" class="nice-input">
             <option value="1k">1K</option>
@@ -84,7 +92,7 @@ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);c
 </div>
 
 <div class="chat-area" id="chat">
-    <div class="message ai"><b>System Online (Accumulating Mode).</b></div>
+    <div class="message ai"><b>System Online (File Manager Ready).</b></div>
 </div>
 
 <div class="bottom-bar">
@@ -101,6 +109,7 @@ const sendBtn = document.getElementById("sendBtn");
 const fileInput = document.getElementById("fileInput");
 const fileName = document.getElementById("fileName");
 const dropZone = document.getElementById("dropZone");
+const fileListContainer = document.getElementById("fileList");
 const imgInput = document.getElementById("imgInput");
 const keyInput = document.getElementById("keyInput");
 const linkInput = document.getElementById("linkInput");
@@ -112,51 +121,67 @@ const format = document.getElementById("format");
 // ✅ LIVE URL
 const API = "https://wavespeedapp-api-7ce9.onrender.com/generate"; 
 
-// --- FILE ACCUMULATION LOGIC ---
-let allSelectedFiles = []; // Master list to store ALL dropped images
+// --- FILE MANAGER LOGIC ---
+let allSelectedFiles = []; // Master list
 
 function handleFiles(files) {
     if(files && files.length > 0) {
-        // Add new files to our master list instead of replacing
+        // Add new files to the master list
         for (let i = 0; i < files.length; i++) {
             allSelectedFiles.push(files[i]);
         }
-
-        // Update UI Text
-        if(allSelectedFiles.length === 1) {
-            fileName.innerText = "✅ " + allSelectedFiles[0].name.substring(0, 15) + "...";
-        } else {
-            fileName.innerText = "✅ " + allSelectedFiles.length + " Images Total";
-        }
-        fileName.style.color = "#fff";
+        renderFileList();
     }
 }
 
-// Visual Feedback for Dragging
+function removeFile(index) {
+    allSelectedFiles.splice(index, 1);
+    renderFileList();
+}
+
+function renderFileList() {
+    fileListContainer.innerHTML = ""; // Clear current list
+    
+    if(allSelectedFiles.length === 0) {
+        fileName.innerText = "📂 Drag & Drop / Click";
+        fileName.style.color = "#aaa";
+        return;
+    }
+
+    fileName.innerText = `✅ ${allSelectedFiles.length} Images Selected`;
+    fileName.style.color = "#fff";
+
+    // Create a row for each file
+    allSelectedFiles.forEach((file, index) => {
+        const div = document.createElement("div");
+        div.className = "file-item";
+        div.innerHTML = `
+            <span>📄 ${file.name.substring(0, 30)}</span>
+            <span class="remove-btn" onclick="removeFile(${index})">✕</span>
+        `;
+        fileListContainer.appendChild(div);
+    });
+}
+
+// Drag Events
 dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
     dropZone.classList.add("dragover");
-    fileName.innerText = "👇 Drop to Add!";
+    fileName.innerText = "👇 Drop Here!";
 });
-
 dropZone.addEventListener("dragleave", () => {
     dropZone.classList.remove("dragover");
-    // Restore text based on current list
-    if(allSelectedFiles.length === 0) fileName.innerText = "📂 Drag & Drop Images";
-    else fileName.innerText = "✅ " + allSelectedFiles.length + " Images Total";
+    if(allSelectedFiles.length === 0) fileName.innerText = "📂 Drag & Drop / Click";
+    else fileName.innerText = `✅ ${allSelectedFiles.length} Images Selected`;
 });
-
 dropZone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropZone.classList.remove("dragover");
     handleFiles(e.dataTransfer.files);
 });
-
-// Click Selection
 fileInput.addEventListener('change', function() {
     handleFiles(this.files);
-    // Reset value so you can select the same file again if needed
-    this.value = ''; 
+    this.value = ''; // Reset input so you can select again
 });
 
 
@@ -166,15 +191,13 @@ function msg(html,type="ai"){
     chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;
 }
 
-// Helper: Convert File to Clean Base64 (No Header)
+// Helper: Convert File to Clean Base64
 const toBase64 = file => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
         let res = reader.result;
-        if(res.includes("base64,")) {
-            res = res.split("base64,")[1];
-        }
+        if(res.includes("base64,")) res = res.split("base64,")[1];
         resolve(res);
     };
     reader.onerror = error => reject(error);
@@ -200,13 +223,12 @@ sendBtn.onclick = async () => {
             }
         }
     } 
-    // 2. Fallback to URL Input
     else if(imgInput.value.trim()) {
         finalImages.push(imgInput.value.trim());
     }
 
     if(finalImages.length === 0) {
-        return alert("❌ ERROR: You must upload at least one image or paste a URL!");
+        return alert("❌ ERROR: You must upload an image or paste a URL!");
     }
 
     sendBtn.disabled = true;
@@ -225,7 +247,7 @@ sendBtn.onclick = async () => {
                 apiUrl:linkInput.value,
                 payload:{
                     prompt,
-                    images: finalImages, // Sends the Accumulated List
+                    images: finalImages,
                     aspect_ratio: aspect.value,
                     resolution: resolution.value,
                     output_format: format.value,
@@ -234,23 +256,29 @@ sendBtn.onclick = async () => {
             })
         });
 
-        clearInterval(t);
+        // 🛑 SAFETY CHECK
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const text = await res.text();
+            throw new Error("Server Error (Check URL): " + text.substring(0, 50) + "...");
+        }
+
         const data = await res.json();
+        clearInterval(t);
 
         if(data.error) throw new Error(data.error);
 
-        // Handle Image Output
         if(data.outputs?.[0]?.data){
             loader.innerHTML = `<img style="max-width:100%;border-radius:12px"
             src="data:image/png;base64,${data.outputs[0].data}">`;
             
-            // Optional: Clear list after successful send? 
-            // Uncomment next line if you want to clear images after sending
-            // allSelectedFiles = []; fileName.innerText = "📂 Drag & Drop Images";
+            // Clean up after success
+            allSelectedFiles = [];
+            renderFileList(); 
             
         } else {
             console.log("Full Response:", data);
-            loader.innerText = "Job finished but output format was unexpected. Check Console.";
+            loader.innerText = "Job finished but output format was unexpected.";
         }
 
     }catch(e){
