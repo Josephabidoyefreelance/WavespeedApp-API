@@ -194,7 +194,8 @@
 <script>
     const chat = document.getElementById('chat');
     const sendBtn = document.getElementById('sendBtn');
-    const LOCAL_SERVER = "const LOCAL_SERVER = "https://wavespeedapp-api-7ce9.onrender.com/generate"";
+    const LOCAL_SERVER =  "https://wavespeedapp-api-7ce9.onrender.com/generate";
+    let timerInt;
 
     function addMsg(html, type="ai") {
         const div = document.createElement('div');
@@ -226,7 +227,6 @@
 
         return null;
     }
-
 
     sendBtn.addEventListener('click', async () => {
         const prompt = document.getElementById('userInput').value;
@@ -304,3 +304,4 @@
 </script>
 </body>
 </html>
+
