@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper: Fix common URL/String issues (Removes extra spaces or quotes)
+// Helper: Fix common URL/String issues
 const clean = (str) => (str ? str.trim().replace(/["']/g, "") : "");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -15,17 +15,23 @@ app.post("/generate", async (req, res) => {
     req.setTimeout(600000);
     res.setTimeout(600000);
 
+    // --- UNIVERSAL API KEY LOGIC ---
+    // 1. Try to get key securely from the environment (Used by Render/Production)
+    let apiKey = process.env.WAVESPEED_API_KEY;
+    
+    // 2. Fallback to key sent from the frontend form (Used for Local Testing)
+    if (!apiKey) {
+        apiKey = req.body.apiKey; 
+    }
+    
+    // Get other job details from the frontend
+    let { apiUrl, payload } = req.body;
+    
     try {
-        // --- FIX: SECURELY GET API KEY FROM RENDER ENVIRONMENT ---
-        const apiKey = process.env.WAVESPEED_API_KEY; 
-        
-        // Get job details from the frontend (only apiUrl and payload remain in req.body)
-        let { apiUrl, payload } = req.body;
-        
-        // Ensure data exists
-        if (!apiKey) {
-            // This is the error that confirms the server is working but the key is missing on Render.
-            return res.status(500).json({ error: "API Key is missing from the server environment. Please set WAVESPEED_API_KEY on Render." });
+        // Final Key Check
+        if (!apiKey || apiKey.trim() === "") {
+            const environment = process.env.NODE_ENV === 'production' ? 'Render' : 'local form input';
+            return res.status(500).json({ error: `API Key is missing. Please provide it in the ${environment}.` });
         }
         
         apiUrl = clean(apiUrl);
@@ -35,7 +41,7 @@ app.post("/generate", async (req, res) => {
 
         console.log(`\n--> New Job received. Prompt: "${payload.prompt}"`);
 
-        // 1. Send Job to WaveSpeed (using the secure key)
+        // 1. Send Job to WaveSpeed (using the determined key)
         const startReq = await fetch(apiUrl, {
             method: "POST",
             headers: {
