@@ -32,9 +32,10 @@ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);c
 .send-btn:disabled{background:var(--border);cursor:not-allowed}
 .timer{font-size:.8rem;background:#fbbf24;color:#000;padding:2px 6px;border-radius:4px;margin-left:6px}
 
-/* Helper for upload label alignment */
-.upload-label { cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; color: #aaa; }
-.upload-label:hover { color: #fff; }
+/* Drag & Drop Styling */
+.upload-label { cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; color: #aaa; transition: all 0.2s; }
+.upload-label:hover { color: #fff; border-color: var(--accent); }
+.upload-label.dragover { background: rgba(59, 130, 246, 0.2); border-color: var(--accent); color: white; border-style: dashed; }
 </style>
 </head>
 
@@ -50,9 +51,9 @@ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);c
     <div class="controls-row">
         <input id="imgInput" class="nice-input" placeholder="Image URL (optional)">
         
-        <label class="nice-input upload-label">
-            <span id="fileName">📂 Upload</span>
-            <input type="file" id="fileInput" accept="image/*" style="display:none">
+        <label class="nice-input upload-label" id="dropZone">
+            <span id="fileName">📂 Drag & Drop Images</span>
+            <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
         </label>
 
         <select id="aspect" class="nice-input">
@@ -76,7 +77,7 @@ body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);c
 </div>
 
 <div class="chat-area" id="chat">
-    <div class="message ai"><b>System Online (Local Mode).</b></div>
+    <div class="message ai"><b>System Online (Drag & Drop Ready).</b></div>
 </div>
 
 <div class="bottom-bar">
@@ -92,6 +93,7 @@ const chat = document.getElementById("chat");
 const sendBtn = document.getElementById("sendBtn");
 const fileInput = document.getElementById("fileInput");
 const fileName = document.getElementById("fileName");
+const dropZone = document.getElementById("dropZone");
 const imgInput = document.getElementById("imgInput");
 const keyInput = document.getElementById("keyInput");
 const linkInput = document.getElementById("linkInput");
@@ -100,19 +102,47 @@ const aspect = document.getElementById("aspect");
 const resolution = document.getElementById("resolution");
 const format = document.getElementById("format");
 
-// ✅ LOCALHOST (PowerShell Logs)
-const API = "https://wavespeedapp-api-7ce9.onrender.com/generate";
+// ✅ LIVE URL (Since you are serving index.html via server.js now)
+const API = "/generate"; 
 
-// UI: Show selected filename
-fileInput.addEventListener('change', function() {
-    if(this.files && this.files[0]) {
-        fileName.innerText = "✅ " + this.files[0].name.substring(0, 12) + "...";
+// --- DRAG & DROP LOGIC ---
+function handleFiles(files) {
+    if(files && files.length > 0) {
+        if(files.length === 1) {
+            fileName.innerText = "✅ " + files[0].name.substring(0, 15) + "...";
+        } else {
+            fileName.innerText = "✅ " + files.length + " Images Selected";
+        }
         fileName.style.color = "#fff";
-    } else {
-        fileName.innerText = "📂 Upload";
-        fileName.style.color = "#aaa";
+        fileInput.files = files; // Sync drop with input
     }
+}
+
+// Visual Feedback for Dragging
+dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+    fileName.innerText = "👇 Drop Here!";
 });
+
+dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("dragover");
+    // Reset text if no files selected yet
+    if(fileInput.files.length === 0) fileName.innerText = "📂 Drag & Drop Images";
+    else handleFiles(fileInput.files); // Restore count
+});
+
+dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    handleFiles(e.dataTransfer.files);
+});
+
+// Click Selection
+fileInput.addEventListener('change', function() {
+    handleFiles(this.files);
+});
+
 
 function msg(html,type="ai"){
     const d=document.createElement("div");
@@ -126,7 +156,6 @@ const toBase64 = file => new Promise((resolve, reject) => {
     reader.readAsDataURL(file);
     reader.onload = () => {
         let res = reader.result;
-        // Important: Remove the "data:image/png;base64," prefix
         if(res.includes("base64,")) {
             res = res.split("base64,")[1];
         }
@@ -140,14 +169,28 @@ sendBtn.onclick = async () => {
     if(!prompt) return alert("Please enter a prompt!");
     if(!keyInput.value) return alert("Please enter your API Key!");
 
-    // --- CHECK FOR IMAGE ---
-    let finalImage = imgInput.value.trim();
+    // --- CHECK FOR IMAGES (MULTIPLE SUPPORT) ---
+    let finalImages = [];
+    
+    // 1. Check File Input (Loop through all files)
     if(fileInput.files.length > 0) {
-        finalImage = await toBase64(fileInput.files[0]);
+        msg(`Processing ${fileInput.files.length} images...`, "ai");
+        for (let i = 0; i < fileInput.files.length; i++) {
+            try {
+                const b64 = await toBase64(fileInput.files[i]);
+                finalImages.push(b64);
+            } catch(err) {
+                console.error("Error reading file:", err);
+            }
+        }
+    } 
+    // 2. Fallback to URL Input if no files
+    else if(imgInput.value.trim()) {
+        finalImages.push(imgInput.value.trim());
     }
 
-    if(!finalImage) {
-        return alert("❌ ERROR: You must either upload an image or paste an Image URL for this prompt!");
+    if(finalImages.length === 0) {
+        return alert("❌ ERROR: You must upload at least one image or paste a URL!");
     }
 
     sendBtn.disabled = true;
@@ -166,7 +209,7 @@ sendBtn.onclick = async () => {
                 apiUrl:linkInput.value,
                 payload:{
                     prompt,
-                    images: [finalImage], // Send array with confirmed image
+                    images: finalImages, // Sends ARRAY of images
                     aspect_ratio: aspect.value,
                     resolution: resolution.value,
                     output_format: format.value,
